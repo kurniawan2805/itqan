@@ -34,7 +34,7 @@ export default function App() {
   const targets = useMemo(() => (settings ? calculateDailyTargets(progress, settings, emergency) : []), [settings, progress, emergency]);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${tab === 'mushaf' ? 'mushaf-mode' : ''}`}>
       <main className="main-panel">
         {tab === 'dashboard' && settings && (
           <section className="dashboard">
@@ -55,6 +55,7 @@ export default function App() {
                   <div>
                     <span className="badge">{target.type}</span>
                     <h2>{target.label}</h2>
+                    <p className="target-description">{describeTarget(target.type)}</p>
                     <p>{target.pages.length ? `Halaman ${formatPages(target.pages)}` : 'Belum ada halaman hafalan.'}</p>
                   </div>
                   <button disabled={!target.pages.length} onClick={() => openPage(target.pages[0])}>
@@ -71,24 +72,26 @@ export default function App() {
           </section>
         )}
 
-        {tab === 'mushaf' && settings && <MushafView page={page} settings={settings} onPageChange={openPage} onProgressChanged={refresh} />}
+        {tab === 'mushaf' && settings && <MushafView page={page} settings={settings} onPageChange={openPage} onHome={() => setTab('dashboard')} onMenu={() => setTab('settings')} onProgressChanged={refresh} />}
         {tab === 'settings' && settings && <SettingsView settings={settings} onChanged={refresh} />}
       </main>
 
-      <nav className="bottom-nav">
-        <button className={tab === 'dashboard' ? 'selected' : ''} onClick={() => setTab('dashboard')}>
-          <BarChart3 size={20} />
-          Dashboard
-        </button>
-        <button className={tab === 'mushaf' ? 'selected' : ''} onClick={() => setTab('mushaf')}>
-          <BookOpen size={20} />
-          Mushaf
-        </button>
-        <button className={tab === 'settings' ? 'selected' : ''} onClick={() => setTab('settings')}>
-          <Settings size={20} />
-          Settings
-        </button>
-      </nav>
+      {tab !== 'mushaf' && (
+        <nav className="bottom-nav">
+          <button className={tab === 'dashboard' ? 'selected' : ''} onClick={() => setTab('dashboard')}>
+            <BarChart3 size={20} />
+            Dashboard
+          </button>
+          <button onClick={() => setTab('mushaf')}>
+            <BookOpen size={20} />
+            Mushaf
+          </button>
+          <button className={tab === 'settings' ? 'selected' : ''} onClick={() => setTab('settings')}>
+            <Settings size={20} />
+            Settings
+          </button>
+        </nav>
+      )}
     </div>
   );
 }
@@ -96,4 +99,11 @@ export default function App() {
 function formatPages(pages: number[]) {
   if (pages.length === 1) return String(pages[0]);
   return `${pages[0]}-${pages[pages.length - 1]}`;
+}
+
+function describeTarget(type: string) {
+  if (type === 'sabaq') return 'Hafalan baru yang dikejar hari ini.';
+  if (type === 'sabqi') return 'Ulangan hafalan baru agar cepat kuat.';
+  if (type === 'manzil') return 'Murajaah hafalan lama supaya tetap lancar.';
+  return '';
 }

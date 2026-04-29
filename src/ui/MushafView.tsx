@@ -1,5 +1,5 @@
 import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Eye, Maximize, Pause, Play, Star } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Grid3X3, Home, Pause, Play, Star } from 'lucide-react';
 import type { SettingsRecord } from '../lib/db';
 import { db } from '../lib/db';
 import { cacheAudio, getVerseAudioUrl } from '../lib/audio';
@@ -8,6 +8,124 @@ import { loadMushafPage } from '../lib/quranwbw/mushafPageLoader';
 import type { MushafPage, QuranVerse, VerseKey } from '../types/quran';
 
 const loadedMushafFonts = new Map<number, Promise<void>>();
+
+const SURAH_NAMES = [
+  '',
+  'Al Faatiha',
+  'Al Baqara',
+  'Aal i Imraan',
+  'An Nisaa',
+  'Al Maaida',
+  "Al An'aam",
+  "Al A'raaf",
+  'Al Anfaal',
+  'At Tawba',
+  'Yunus',
+  'Hud',
+  'Yusuf',
+  "Ar Ra'd",
+  'Ibrahim',
+  'Al Hijr',
+  'An Nahl',
+  'Al Israa',
+  'Al Kahf',
+  'Maryam',
+  'Taa Haa',
+  'Al Anbiyaa',
+  'Al Hajj',
+  'Al Muminoon',
+  'An Noor',
+  'Al Furqaan',
+  "Ash Shu'araa",
+  'An Naml',
+  'Al Qasas',
+  'Al Ankaboot',
+  'Ar Room',
+  'Luqman',
+  'As Sajda',
+  'Al Ahzaab',
+  'Saba',
+  'Faatir',
+  'Yaseen',
+  'As Saaffaat',
+  'Saad',
+  'Az Zumar',
+  'Al Ghaafir',
+  'Fussilat',
+  'Ash Shura',
+  'Az Zukhruf',
+  'Ad Dukhaan',
+  'Al Jaathiya',
+  'Al Ahqaf',
+  'Muhammad',
+  'Al Fath',
+  'Al Hujuraat',
+  'Qaaf',
+  'Adh Dhaariyat',
+  'At Tur',
+  'An Najm',
+  'Al Qamar',
+  'Ar Rahmaan',
+  'Al Waaqia',
+  'Al Hadid',
+  'Al Mujaadila',
+  'Al Hashr',
+  'Al Mumtahana',
+  'As Saff',
+  "Al Jumu'a",
+  'Al Munaafiqoon',
+  'At Taghaabun',
+  'At Talaaq',
+  'At Tahrim',
+  'Al Mulk',
+  'Al Qalam',
+  'Al Haaqqa',
+  "Al Ma'aarij",
+  'Nooh',
+  'Al Jinn',
+  'Al Muzzammil',
+  'Al Muddaththir',
+  'Al Qiyaama',
+  'Al Insaan',
+  'Al Mursalaat',
+  'An Naba',
+  "An Naazi'aat",
+  'Abasa',
+  'At Takwir',
+  'Al Infitaar',
+  'Al Mutaffifin',
+  'Al Inshiqaaq',
+  'Al Burooj',
+  'At Taariq',
+  "Al A'laa",
+  'Al Ghaashiya',
+  'Al Fajr',
+  'Al Balad',
+  'Ash Shams',
+  'Al Lail',
+  'Ad Dhuhaa',
+  'Ash Sharh',
+  'At Tin',
+  'Al Alaq',
+  'Al Qadr',
+  'Al Bayyina',
+  'Az Zalzala',
+  'Al Aadiyaat',
+  "Al Qaari'a",
+  'At Takaathur',
+  'Al Asr',
+  'Al Humaza',
+  'Al Fil',
+  'Quraish',
+  "Al Maa'un",
+  'Al Kawthar',
+  'Al Kaafiroon',
+  'An Nasr',
+  'Al Masad',
+  'Al Ikhlaas',
+  'Al Falaq',
+  'An Naas'
+];
 
 const CENTERED_PAGE_LINES = new Set([
   '1:9',
@@ -46,10 +164,12 @@ type Props = {
   page: number;
   settings: SettingsRecord;
   onPageChange: (page: number) => void;
+  onHome: () => void;
+  onMenu: () => void;
   onProgressChanged: () => void;
 };
 
-export default function MushafView({ page, settings, onPageChange, onProgressChanged }: Props) {
+export default function MushafView({ page, settings, onPageChange, onHome, onMenu, onProgressChanged }: Props) {
   const [mushafPage, setMushafPage] = useState<MushafPage | null>(null);
   const [selectedVerse, setSelectedVerse] = useState<VerseKey | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +232,15 @@ export default function MushafView({ page, settings, onPageChange, onProgressCha
     };
   }, [mushafPage, selectedVerse]);
 
+  const pageSummary = useMemo(() => {
+    if (!mushafPage) return null;
+    const surahs = Array.from(new Set(mushafPage.verses.map((verse) => verse.meta.surah)));
+    const surahLabel = surahs.map((surah) => SURAH_NAMES[surah] ?? `Surah ${surah}`).join(' / ');
+    const juz = mushafPage.verses[0]?.meta.juz;
+
+    return { surahLabel, juz };
+  }, [mushafPage]);
+
   async function playVerse(key: VerseKey) {
     if (playing === key) {
       audioRef.current?.pause();
@@ -141,17 +270,26 @@ export default function MushafView({ page, settings, onPageChange, onProgressCha
   return (
     <section className="mushaf-screen">
       <header className="mushaf-topbar">
-        <button className="icon-command" disabled={page >= 604} onClick={() => onPageChange(page + 1)} aria-label="Halaman berikutnya">
-          <ChevronLeft size={20} />
+        <button className="mushaf-top-pill" onClick={onHome} aria-label="Kembali ke dashboard">
+          <Home size={15} />
+          Home
         </button>
-        <div>
-          <p className="eyebrow">Mushaf</p>
-          <h1>Halaman {page}</h1>
+        <div className="mushaf-page-title">
+          Page {page}
+          <ChevronDown size={13} />
         </div>
-        <button className="icon-command" disabled={page <= 1} onClick={() => onPageChange(page - 1)} aria-label="Halaman sebelumnya">
-          <ChevronRight size={20} />
+        <button className="mushaf-top-pill" onClick={onMenu} aria-label="Buka menu pengaturan">
+          Menu
+          <Grid3X3 size={15} />
         </button>
       </header>
+
+      {pageSummary && (
+        <div className="mushaf-page-meta">
+          <span>{pageSummary.surahLabel}</span>
+          <span>Juz {pageSummary.juz}</span>
+        </div>
+      )}
 
       {error && <p className="error-box">{error}</p>}
       {!mushafPage && !error && <p className="loading">Memuat data QuranWBW...</p>}
@@ -208,15 +346,11 @@ export default function MushafView({ page, settings, onPageChange, onProgressCha
         <button disabled={page >= 604} onClick={() => onPageChange(page + 1)} aria-label="Halaman berikutnya">
           <ChevronLeft size={18} />
         </button>
-        <button aria-label="Mode lihat">
-          <Eye size={18} />
-        </button>
+        <button onClick={onHome} aria-label="Kembali ke dashboard"><Home size={18} /></button>
         <button className="primary" onClick={() => selectedVerse && playVerse(selectedVerse)} disabled={!selectedVerse} aria-label="Putar ayat terpilih">
           {playing ? <Pause size={20} /> : <Play size={20} />}
         </button>
-        <button aria-label="Layar penuh">
-          <Maximize size={18} />
-        </button>
+        <button onClick={onMenu} aria-label="Buka menu"><Grid3X3 size={18} /></button>
         <button disabled={page <= 1} onClick={() => onPageChange(page - 1)} aria-label="Halaman sebelumnya">
           <ChevronRight size={18} />
         </button>
