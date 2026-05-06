@@ -8,7 +8,8 @@ const WORD_AUDIO_CACHE = 'quran-word-audio';
 export function getVerseAudioUrl(key: VerseKey, reciterId: ReciterId) {
   const [surah, ayah] = key.split(':').map(Number);
   const filename = `${String(surah).padStart(3, '0')}${String(ayah).padStart(3, '0')}.mp3`;
-  return `${reciters[reciterId].baseUrl}/${filename}`;
+  const reciter = reciters[reciterId] ?? reciters['husary-muallim'];
+  return `${reciter.baseUrl}/${filename}`;
 }
 
 export function getWordAudioUrl(key: `${number}:${number}:${number}`) {

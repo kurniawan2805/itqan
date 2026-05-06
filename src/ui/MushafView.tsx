@@ -1,13 +1,30 @@
-import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Grid3X3, Home, Pause, Play, Star } from 'lucide-react';
+import { Fragment, type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Grid3X3, Home, Pause, Play, Repeat, Star } from 'lucide-react';
 import type { SettingsRecord } from '../lib/db';
 import { db } from '../lib/db';
 import { cacheAudio, getVerseAudioUrl } from '../lib/audio';
-import { getMushafFontUrl } from '../lib/quranwbw/config';
+import { getBismillahFontUrl, getChapterHeaderFontUrl, getMushafFontUrl } from '../lib/quranwbw/config';
+import type { ReciterId } from '../lib/quranwbw/config';
 import { loadMushafPage } from '../lib/quranwbw/mushafPageLoader';
+import type { DailyTarget } from '../lib/scheduler';
 import type { MushafPage, QuranVerse, VerseKey } from '../types/quran';
 
 const loadedMushafFonts = new Map<number, Promise<void>>();
+let loadedChapterHeaderFont: Promise<void> | null = null;
+let loadedBismillahFont: Promise<void> | null = null;
+
+const CHAPTER_HEADER_CODES = [
+  '',
+  'ﱅ ', 'ﱆ ', 'ﱇ ', 'ﱊ ', 'ﱋ ', 'ﱎ ', 'ﱏ ', 'ﱑ ', 'ﱒ ', 'ﱓ ', 'ﱕ ', 'ﱖ ', 'ﱘ ', 'ﱚ ', 'ﱛ ', 'ﱜ ', 'ﱝ ', 'ﱞ ', 'ﱡ ', 'ﱢ ', 'ﱤ ', 'ﭑ ', 'ﭒ ', 'ﭔ ', 'ﭕ ', 'ﭗ ', 'ﭘ ', 'ﭚ ', 'ﭛ ', 'ﭝ ', 'ﭞ ', 'ﭠ ', 'ﭡ ', 'ﭣ ', 'ﭤ ', 'ﭦ ', 'ﭧ ', 'ﭩ ', 'ﭪ ', 'ﭬ ', 'ﭭ ', 'ﭯ ', 'ﭰ ', 'ﭲ ', 'ﭳ ', 'ﭵ ', 'ﭶ ', 'ﭸ ', 'ﭹ ', 'ﭻ ', 'ﭼ ', 'ﭾ ', 'ﭿ ', 'ﮁ ', 'ﮂ ', 'ﮄ ', 'ﮅ ', 'ﮇ ', 'ﮈ ', 'ﮊ ', 'ﮋ ', 'ﮍ ', 'ﮎ ', 'ﮐ ', 'ﮑ ', 'ﮓ ', 'ﮔ ', 'ﮖ ', 'ﮗ ', 'ﮙ ', 'ﮚ ', 'ﮜ ', 'ﮝ ', 'ﮟ ', 'ﮠ ', 'ﮢ ', 'ﮣ ', 'ﮥ ', 'ﮦ ', 'ﮨ ', 'ﮩ ', 'ﮫ ', 'ﮬ ', 'ﮮ ', 'ﮯ ', 'ﮱ ', '﮲ ', '﮴ ', '﮵ ', '﮷ ', '﮸ ', '﮺ ', '﮻ ', '﮽ ', '﮾ ', '﯀ ', '﯁ ', 'ﯓ ', 'ﯔ ', 'ﯖ ', 'ﯗ ', 'ﯙ ', 'ﯚ ', 'ﯜ ', 'ﯝ ', 'ﯟ ', 'ﯠ ', 'ﯢ ', 'ﯣ ', 'ﯥ ', 'ﯦ ', 'ﯨ ', 'ﯩ ', 'ﯫ'
+];
+
+const BISMILLAH_BY_SURAH: Record<number, string> = {
+  2: 'ﲚﲛﲞﲤ',
+  95: 'ﭗﲫﲮﲴ',
+  97: 'ﭗﲫﲮﲴ'
+};
+
+const DEFAULT_BISMILLAH = 'ﲪﲫﲮﲴ';
 
 const SURAH_NAMES = [
   '',
@@ -163,26 +180,38 @@ const CENTERED_PAGE_LINES = new Set([
 type Props = {
   page: number;
   settings: SettingsRecord;
+  reviewTarget?: DailyTarget | null;
   onPageChange: (page: number) => void;
   onHome: () => void;
   onMenu: () => void;
   onProgressChanged: () => void;
 };
 
-export default function MushafView({ page, settings, onPageChange, onHome, onMenu, onProgressChanged }: Props) {
+type ReviewVerse = { key: VerseKey; page: number; surah: number; ayah: number };
+
+export default function MushafView({ page, settings, reviewTarget, onPageChange, onHome, onMenu, onProgressChanged }: Props) {
   const [mushafPage, setMushafPage] = useState<MushafPage | null>(null);
   const [selectedVerse, setSelectedVerse] = useState<VerseKey | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState<VerseKey | null>(null);
+  const [reviewPlaylist, setReviewPlaylist] = useState<ReviewVerse[]>([]);
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [reviewPlaying, setReviewPlaying] = useState(false);
+  const [reviewRepeat, setReviewRepeat] = useState(false);
+  const [reviewDone, setReviewDone] = useState(false);
+  const [pageDialogOpen, setPageDialogOpen] = useState(false);
+  const [pageInput, setPageInput] = useState(String(page));
   const [fontReady, setFontReady] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const pageInputRef = useRef<HTMLInputElement>(null);
+  const reviewRunRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
     setMushafPage(null);
     setError(null);
 
-    loadMushafPage(page)
+    loadMushafPage(page, settings.word_translation)
       .then((data) => {
         if (!cancelled) setMushafPage(data);
       })
@@ -193,7 +222,20 @@ export default function MushafView({ page, settings, onPageChange, onHome, onMen
     return () => {
       cancelled = true;
     };
+  }, [page, settings.word_translation]);
+
+  useEffect(() => {
+    setPageInput(String(page));
   }, [page]);
+
+  useEffect(() => {
+    if (!pageDialogOpen) return;
+
+    requestAnimationFrame(() => {
+      pageInputRef.current?.focus();
+      pageInputRef.current?.select();
+    });
+  }, [pageDialogOpen]);
 
   useEffect(() => {
     setFontReady(false);
@@ -201,7 +243,7 @@ export default function MushafView({ page, settings, onPageChange, onHome, onMen
 
     let cancelled = false;
 
-    loadMushafFont(page)
+    Promise.all([loadMushafFont(page), loadChapterHeaderFont(), loadBismillahFont()])
       .then(() => {
         if (!cancelled) setFontReady(true);
       })
@@ -213,6 +255,35 @@ export default function MushafView({ page, settings, onPageChange, onHome, onMen
       cancelled = true;
     };
   }, [mushafPage, page]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReviewPlaylist([]);
+    setReviewIndex(0);
+    setReviewPlaying(false);
+    setReviewDone(false);
+
+    if (!reviewTarget) return;
+
+    Promise.all(reviewTarget.pages.map((targetPage) => loadMushafPage(targetPage, settings.word_translation)))
+      .then((pages) => {
+        if (cancelled) return;
+        setReviewPlaylist(
+          pages.flatMap((mushaf) =>
+            mushaf.verses.map((verse) => ({ key: verse.key, page: mushaf.pageNumber, surah: verse.meta.surah, ayah: verse.meta.ayah }))
+          )
+        );
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Gagal memuat target murajaah.');
+      });
+
+    return () => {
+      cancelled = true;
+      reviewRunRef.current += 1;
+      audioRef.current?.pause();
+    };
+  }, [reviewTarget, settings.word_translation]);
 
   const lines = useMemo(() => {
     if (!mushafPage) return [];
@@ -248,7 +319,7 @@ export default function MushafView({ page, settings, onPageChange, onHome, onMen
       return;
     }
 
-    const src = await cacheAudio(getVerseAudioUrl(key, settings.reciter), 'verse');
+    const src = await cacheAudio(getVerseAudioUrl(key, settings.review_reciter as ReciterId), 'verse');
     if (!audioRef.current) return;
     audioRef.current.src = src;
     await audioRef.current.play();
@@ -267,6 +338,74 @@ export default function MushafView({ page, settings, onPageChange, onHome, onMen
     setSelectedVerse(null);
   }
 
+  async function playReviewRange(startIndex = reviewIndex) {
+    if (!reviewPlaylist.length) return;
+    const runId = reviewRunRef.current + 1;
+    reviewRunRef.current = runId;
+    setReviewPlaying(true);
+    setReviewDone(false);
+
+    let cursor = startIndex;
+    while (cursor < reviewPlaylist.length && reviewRunRef.current === runId) {
+      const verse = reviewPlaylist[cursor];
+      setReviewIndex(cursor);
+      if (verse.page !== page) onPageChange(verse.page);
+
+      const src = await cacheAudio(getVerseAudioUrl(verse.key, settings.review_reciter as ReciterId), 'verse');
+      if (!audioRef.current) break;
+      audioRef.current.src = src;
+      await audioRef.current.play();
+      await new Promise<void>((resolve) => {
+        if (!audioRef.current) return resolve();
+        audioRef.current.onended = () => resolve();
+        audioRef.current.onerror = () => resolve();
+        audioRef.current.onpause = () => resolve();
+      });
+      if (reviewRunRef.current !== runId || audioRef.current.paused) break;
+      cursor += 1;
+
+      if (cursor >= reviewPlaylist.length && reviewRepeat) cursor = 0;
+      if (!reviewRepeat && cursor >= reviewPlaylist.length) break;
+    }
+
+    setReviewPlaying(false);
+  }
+
+  function pauseReview() {
+    reviewRunRef.current += 1;
+    audioRef.current?.pause();
+    setReviewPlaying(false);
+  }
+
+  async function markReviewDone() {
+    if (!reviewTarget) return;
+    const now = new Date().toISOString();
+
+    for (const targetPage of reviewTarget.pages) {
+      const existing = await db.progress.where('page_number').equals(targetPage).first();
+      const payload = { page_number: targetPage, status: reviewTarget.type, last_reviewed: now, quality_score: 4 } as const;
+      if (existing?.id) await db.progress.update(existing.id, payload);
+      else await db.progress.add(payload);
+    }
+
+    setReviewDone(true);
+    onProgressChanged();
+  }
+
+  function goReviewPage(direction: 1 | -1) {
+    if (!reviewTarget?.pages.length) return;
+    const currentTargetIndex = Math.max(0, reviewTarget.pages.indexOf(page));
+    const nextTargetIndex = Math.min(reviewTarget.pages.length - 1, Math.max(0, currentTargetIndex + direction));
+    onPageChange(reviewTarget.pages[nextTargetIndex]);
+  }
+
+  function submitPageNavigation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextPage = Math.min(604, Math.max(1, Number(pageInput) || page));
+    onPageChange(nextPage);
+    setPageDialogOpen(false);
+  }
+
   return (
     <section className="mushaf-screen">
       <header className="mushaf-topbar">
@@ -274,10 +413,10 @@ export default function MushafView({ page, settings, onPageChange, onHome, onMen
           <Home size={15} />
           Home
         </button>
-        <div className="mushaf-page-title">
+        <button className="mushaf-page-title" onClick={() => setPageDialogOpen(true)} aria-label="Navigasi cepat halaman">
           Page {page}
           <ChevronDown size={13} />
-        </div>
+        </button>
         <button className="mushaf-top-pill" onClick={onMenu} aria-label="Buka menu pengaturan">
           Menu
           <Grid3X3 size={15} />
@@ -286,8 +425,8 @@ export default function MushafView({ page, settings, onPageChange, onHome, onMen
 
       {pageSummary && (
         <div className="mushaf-page-meta">
-          <span>{pageSummary.surahLabel}</span>
-          <span>Juz {pageSummary.juz}</span>
+          <span>{reviewTarget ? `${reviewTarget.label} · ${formatPages(reviewTarget.pages)} · ${reviewPlaylist.length} ayat` : pageSummary.surahLabel}</span>
+          <span>{reviewTarget ? `Ayat ${reviewIndex + 1}/${reviewPlaylist.length || 0}` : `Juz ${pageSummary.juz}`}</span>
         </div>
       )}
 
@@ -309,13 +448,21 @@ export default function MushafView({ page, settings, onPageChange, onHome, onMen
 
               return (
                 <div className="mushaf-line-group" key={line}>
-                  {startsChapter && <div className="chapter-break">Surah {startsChapter.surah}</div>}
+                  {startsChapter && (
+                    <div className="mushaf-chapter-start">
+                      <div className="chapter-header" aria-label={`Surah ${SURAH_NAMES[startsChapter.surah] ?? startsChapter.surah}`}>
+                        {CHAPTER_HEADER_CODES[startsChapter.surah]}
+                      </div>
+                      <Bismillah surah={startsChapter.surah} />
+                    </div>
+                  )}
                   <div className={`mushaf-line ${centered ? 'centered' : ''}`}>
                     <LineWords
                       page={mushafPage}
                       line={line}
                       selectedVerse={selectedVerse}
                       playing={playing}
+                      activeReviewVerse={reviewPlaylist[reviewIndex]?.key ?? null}
                       onSelect={(key) => setSelectedVerse((value) => (value === key ? null : key))}
                     />
                   </div>
@@ -342,16 +489,33 @@ export default function MushafView({ page, settings, onPageChange, onHome, onMen
         </div>
       )}
 
-      <div className="mushaf-audio-toolbar" aria-label="Kontrol Mushaf">
-        <button disabled={page >= 604} onClick={() => onPageChange(page + 1)} aria-label="Halaman berikutnya">
+      {reviewDone && <p className="review-done-toast">Murajaah selesai. Progres diperbarui.</p>}
+
+      {pageDialogOpen && (
+        <div className="dialog-backdrop" role="presentation" onClick={() => setPageDialogOpen(false)}>
+          <form className="page-dialog" onSubmit={submitPageNavigation} role="dialog" aria-modal="true" aria-label="Navigasi cepat halaman" onClick={(event) => event.stopPropagation()}>
+            <label>
+              Buka halaman
+              <input ref={pageInputRef} autoFocus inputMode="numeric" min={1} max={604} type="number" value={pageInput} onFocus={(event) => event.currentTarget.select()} onChange={(event) => setPageInput(event.target.value)} />
+            </label>
+            <div className="page-dialog-actions">
+              <button type="button" onClick={() => setPageDialogOpen(false)}>Batal</button>
+              <button type="submit">Buka</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <div className="mushaf-audio-toolbar" aria-label={reviewTarget ? 'Kontrol murajaah' : 'Kontrol Mushaf'}>
+        <button disabled={reviewTarget ? page === reviewTarget.pages[reviewTarget.pages.length - 1] : page >= 604} onClick={() => (reviewTarget ? goReviewPage(1) : onPageChange(page + 1))} aria-label="Halaman berikutnya">
           <ChevronLeft size={18} />
         </button>
-        <button onClick={onHome} aria-label="Kembali ke dashboard"><Home size={18} /></button>
-        <button className="primary" onClick={() => selectedVerse && playVerse(selectedVerse)} disabled={!selectedVerse} aria-label="Putar ayat terpilih">
-          {playing ? <Pause size={20} /> : <Play size={20} />}
+        {reviewTarget ? <button className={reviewRepeat ? 'active' : ''} onClick={() => setReviewRepeat((value) => !value)} aria-label="Ulangi range"><Repeat size={18} /></button> : <button onClick={onHome} aria-label="Kembali ke dashboard"><Home size={18} /></button>}
+        <button className="primary" onClick={() => (reviewTarget ? (reviewPlaying ? pauseReview() : void playReviewRange()) : selectedVerse && playVerse(selectedVerse))} disabled={reviewTarget ? !reviewPlaylist.length : !selectedVerse} aria-label="Putar audio">
+          {reviewPlaying || playing ? <Pause size={20} /> : <Play size={20} />}
         </button>
-        <button onClick={onMenu} aria-label="Buka menu"><Grid3X3 size={18} /></button>
-        <button disabled={page <= 1} onClick={() => onPageChange(page - 1)} aria-label="Halaman sebelumnya">
+        <button onClick={() => (reviewTarget ? void markReviewDone() : onMenu())} aria-label={reviewTarget ? 'Tandai murajaah selesai' : 'Buka menu'}>{reviewTarget ? <Check size={18} /> : <Grid3X3 size={18} />}</button>
+        <button disabled={reviewTarget ? page === reviewTarget.pages[0] : page <= 1} onClick={() => (reviewTarget ? goReviewPage(-1) : onPageChange(page - 1))} aria-label="Halaman sebelumnya">
           <ChevronRight size={18} />
         </button>
       </div>
@@ -366,12 +530,14 @@ function LineWords({
   line,
   selectedVerse,
   playing,
+  activeReviewVerse,
   onSelect
 }: {
   page: MushafPage;
   line: number;
   selectedVerse: VerseKey | null;
   playing: VerseKey | null;
+  activeReviewVerse: VerseKey | null;
   onSelect: (key: VerseKey) => void;
 }) {
   const words = getLineWords(page, line);
@@ -381,7 +547,7 @@ function LineWords({
       {words.map(({ verse, word, index }) => (
         <Fragment key={`${verse.key}-${line}-${index}`}>
           <button
-            className={`word-button ${selectedVerse === verse.key ? 'selected' : ''} ${playing === verse.key ? 'playing' : ''}`}
+            className={`word-button ${selectedVerse === verse.key ? 'selected' : ''} ${playing === verse.key || activeReviewVerse === verse.key ? 'playing' : ''}`}
             onClick={() => onSelect(verse.key)}
             aria-label={`Ayat ${verse.key}`}
           >
@@ -398,12 +564,24 @@ function LineWords({
   );
 }
 
+function Bismillah({ surah }: { surah: number }) {
+  if (surah === 1 || surah === 9) return null;
+
+  return <div className={`bismillah ${surah === 2 ? 'bismillah-wide' : ''}`}>{BISMILLAH_BY_SURAH[surah] ?? DEFAULT_BISMILLAH}</div>;
+}
+
 function getLineWords(page: MushafPage, line: number) {
   return page.verses.flatMap((verse) =>
     verse.words
       .map((word, index) => ({ verse, word, index }))
       .filter((item) => item.word.line === line)
   );
+}
+
+function formatPages(pages: number[]) {
+  if (!pages.length) return 'Tidak ada halaman';
+  if (pages.length === 1) return `Halaman ${pages[0]}`;
+  return `Halaman ${pages[0]}-${pages[pages.length - 1]}`;
 }
 
 function loadMushafFont(page: number) {
@@ -419,4 +597,28 @@ function loadMushafFont(page: number) {
 
   loadedMushafFonts.set(page, request);
   return request;
+}
+
+function loadChapterHeaderFont() {
+  if (loadedChapterHeaderFont) return loadedChapterHeaderFont;
+
+  loadedChapterHeaderFont = new FontFace('chapter-headers', `url(${getChapterHeaderFontUrl()})`)
+    .load()
+    .then((font) => {
+      document.fonts.add(font);
+    });
+
+  return loadedChapterHeaderFont;
+}
+
+function loadBismillahFont() {
+  if (loadedBismillahFont) return loadedBismillahFont;
+
+  loadedBismillahFont = new FontFace('bismillah', `url(${getBismillahFontUrl()})`)
+    .load()
+    .then((font) => {
+      document.fonts.add(font);
+    });
+
+  return loadedBismillahFont;
 }

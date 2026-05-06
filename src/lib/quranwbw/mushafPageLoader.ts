@@ -1,17 +1,17 @@
 import type { MushafPage, QuranVerse, VerseKey } from '../../types/quran';
-import { quranwbwUrls } from './config';
+import { getWordTranslationUrl, quranwbwUrls, type WordTranslationId } from './config';
 import { fetchAndCacheJson } from './quranProvider';
 import { getPageVerseKeys, getVerseKeyData } from './segmentKeys';
 
 type RawWordData = Record<string, Record<string, [string[], number[], string[]?]>>;
 type RawAuxData = Record<string, Record<string, [string[]]>>;
 
-export async function loadMushafPage(pageNumber: number): Promise<MushafPage> {
+export async function loadMushafPage(pageNumber: number, translationId: WordTranslationId = 4): Promise<MushafPage> {
   const [keys, verseKeyData, arabicData, translationData, transliterationData] = await Promise.all([
     getPageVerseKeys(pageNumber),
     getVerseKeyData(),
     fetchAndCacheJson<RawWordData>(quranwbwUrls.arabicWords),
-    fetchAndCacheJson<RawAuxData>(quranwbwUrls.englishWords),
+    fetchAndCacheJson<RawAuxData>(getWordTranslationUrl(translationId)),
     fetchAndCacheJson<RawAuxData>(quranwbwUrls.transliterationWords)
   ]);
 
