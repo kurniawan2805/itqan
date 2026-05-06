@@ -193,10 +193,15 @@ export default function StudyView({ target, settings, onBack, onDone }: { target
           </div>
 
           <article className="study-info-card">
-            {activeTab === 'meaning' && <p>Tap kata Arab untuk mendengar audio kata dan melihat arti kata.</p>}
+            {activeTab === 'meaning' && (
+              <>
+                <b>Arti Ayat</b>
+                <p>{item.translation}</p>
+              </>
+            )}
             {activeTab === 'context' && <p>Ayat sekitar: {items[index - 1]?.label ?? '-'} | {items[index + 1]?.label ?? '-'}</p>}
             {activeTab === 'connected' && <p>Terhubung dengan target hari ini: {item.verseKeys.join(', ')}</p>}
-            {activeTab === 'similar' && <p>Deteksi ayat mirip akan memakai frasa Arab dari data lokal. Versi awal belum menampilkan daftar lengkap.</p>}
+            {activeTab === 'similar' && <p>Deteksi ayat mirip akan dipakai frasa Arab dari data lokal. Versi awal belum menampilkan daftar lengkap.</p>}
           </article>
 
           <article className="method-card">

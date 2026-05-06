@@ -9,15 +9,16 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Itqan',
+        name: 'Itqan - Tahfidz Assistant',
         short_name: 'Itqan',
-        description: 'Offline-first tahfidz assistant with QuranWBW Mushaf data.',
-        theme_color: '#064e3b',
-        background_color: '#f8fafc',
+        description: 'Offline-first tahfidz assistant',
+        theme_color: '#b68a18',
+        background_color: '#f5f1e8',
         display: 'standalone',
+        orientation: 'portrait',
+        start_url: '/',
         icons: [
-          { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' }
+          { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' }
         ]
       },
       workbox: {
