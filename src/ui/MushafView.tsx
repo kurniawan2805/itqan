@@ -9,6 +9,10 @@ import { loadMushafPage } from '../lib/quranwbw/mushafPageLoader';
 import type { DailyTarget } from '../lib/scheduler';
 import type { MushafPage, QuranVerse, VerseKey } from '../types/quran';
 
+function cn(...classes: (string | undefined | null | false)[]) {
+  return classes.filter(Boolean).join(' ');
+}
+
 const loadedMushafFonts = new Map<number, Promise<void>>();
 let loadedChapterHeaderFont: Promise<void> | null = null;
 let loadedBismillahFont: Promise<void> | null = null;
@@ -25,6 +29,12 @@ const BISMILLAH_BY_SURAH: Record<number, string> = {
 };
 
 const DEFAULT_BISMILLAH = 'ﲪﲫﲮﲴ';
+
+function getBismillahCode(surah: number) {
+  if (surah === 2) return BISMILLAH_BY_SURAH[2];
+  if (surah === 95 || surah === 97) return BISMILLAH_BY_SURAH[95];
+  return DEFAULT_BISMILLAH;
+}
 
 const SURAH_NAMES = [
   '',
@@ -441,19 +451,30 @@ export default function MushafView({ page, settings, reviewTarget, onPageChange,
             .mushaf-page-${page} .word.v4-word{font-palette:--itqan-mushaf-words-${page};}
             .mushaf-page-${page} .ayah-end.v4-word{font-palette:--itqan-mushaf-ayah-${page};}
           `}</style>
-          <div className={`mushaf-page-inner mushaf-page-${page}`}>
+<div className={`mushaf-page-inner mushaf-page-${page}`}>
             {lines.map((line) => {
               const startsChapter = mushafPage.chapters.find((chapter) => chapter.line === line && chapter.firstAyah === 1);
               const centered = CENTERED_PAGE_LINES.has(`${page}:${line}`);
-
+              const chapterName = startsChapter ? SURAH_NAMES[startsChapter.surah] ?? `Surah ${startsChapter.surah}` : null;
+              const showBismillah = startsChapter && startsChapter.surah !== 1 && startsChapter.surah !== 9;
               return (
-                <div className="mushaf-line-group" key={line}>
+                <div key={line}>
                   {startsChapter && (
                     <div className="mushaf-chapter-start">
-                      <div className="chapter-header" aria-label={`Surah ${SURAH_NAMES[startsChapter.surah] ?? startsChapter.surah}`}>
-                        {CHAPTER_HEADER_CODES[startsChapter.surah]}
+                      <div
+                        className={cn("amaly-chapter-header", !fontReady && "font-serif text-[0.52em] font-bold leading-tight")}
+                        style={fontReady ? { fontFamily: "chapter-headers" } : undefined}
+                      >
+                        {fontReady ? CHAPTER_HEADER_CODES[startsChapter.surah] : `سورة ${chapterName}`}
                       </div>
-                      <Bismillah surah={startsChapter.surah} />
+                      {showBismillah ? (
+                        <div
+                          className={cn("bismillah", !fontReady && "font-arabic")}
+                          style={fontReady ? { fontFamily: "bismillah" } : undefined}
+                        >
+                          {fontReady ? getBismillahCode(startsChapter.surah) : "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"}
+                        </div>
+                      ) : null}
                     </div>
                   )}
                   <div className={`mushaf-line ${centered ? 'centered' : ''}`}>
