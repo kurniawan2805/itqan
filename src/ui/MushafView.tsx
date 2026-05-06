@@ -469,7 +469,7 @@ export default function MushafView({ page, settings, reviewTarget, onPageChange,
                       </div>
                       {showBismillah ? (
                         <div
-                          className={cn("bismillah", !fontReady && "font-arabic")}
+                          className={cn("amaly-bismillah", !fontReady && "font-arabic")}
                           style={fontReady ? { fontFamily: "bismillah" } : undefined}
                         >
                           {fontReady ? getBismillahCode(startsChapter.surah) : "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"}
