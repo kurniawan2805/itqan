@@ -838,7 +838,7 @@ select:focus {
   background: var(--surface);
   padding: 16px 18px;
   box-shadow: var(--shadow-sm);
-  max-height: 25vh;
+  max-height: 18vh;
   overflow-y: auto;
 }
 
