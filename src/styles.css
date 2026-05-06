@@ -475,8 +475,11 @@ select:focus {
 
 .mushaf-chapter-start {
   width: 100%;
-  margin: 0.35rem 0 0.85rem;
+  display: flex;
+  flex-direction: column;
   text-align: center;
+  margin: 0;
+  padding: 0;
 }
 
 .amaly-chapter-header {
@@ -485,19 +488,27 @@ select:focus {
   font-size: clamp(7rem, 28vw, 11.5rem);
   line-height: 0.5;
   font-palette: normal;
-  margin-top: -0.1rem;
-  margin-bottom: 0;
-  padding-top: 0;
-  padding-bottom: 0;
+  margin: -0.25rem 0 0;
+  padding: 0;
 }
 
 .amaly-bismillah {
-  margin-top: 0.5rem;
   font-family: bismillah, serif;
   font-size: clamp(1.65rem, 5vw, 2.25rem);
   font-palette: normal;
   line-height: 1.1;
-  margin-bottom: 0.5rem;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+
+@media (min-width: 768px) {
+  .amaly-chapter-header {
+    margin: -0.5rem 0 0;
+  }
+  
+  .amaly-bismillah {
+    margin: 1.5rem 0;
+  }
 }
 
 .chapter-header {
