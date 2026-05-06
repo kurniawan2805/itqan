@@ -1,5 +1,5 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
-import { BookOpen, ChevronLeft, ChevronRight, Link, Pause, Play, RotateCcw, Sparkles } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, Pause, Play, Sparkles } from 'lucide-react';
 import { cacheAudio, getVerseAudioUrl, getWordAudioUrl } from '../lib/audio';
 import { db, type SettingsRecord } from '../lib/db';
 import type { DailyTarget } from '../lib/scheduler';
@@ -77,11 +77,11 @@ export default function StudyView({ target, settings, onBack, onDone }: { target
     if (item) void loadStudyFont(item.page);
   }, [item]);
 
-  async function playCurrent(repeats = target.type === 'sabaq' ? 5 : 1) {
+async function playCurrent() {
     if (!item || playing) return;
     setPlaying(true);
     try {
-      await playItem(item, repeats);
+      await playItem(item, audioMode === 'word' ? 5 : 1);
     } finally {
       setPlaying(false);
     }
@@ -185,23 +185,9 @@ export default function StudyView({ target, settings, onBack, onDone }: { target
             </p>
           </article>
 
-          <div className="study-tabs">
-            <button className={activeTab === 'meaning' ? 'selected' : ''} onClick={() => setActiveTab('meaning')}><BookOpen size={15} /> Meaning</button>
-            <button className={activeTab === 'context' ? 'selected' : ''} onClick={() => setActiveTab('context')}>Context</button>
-            <button className={activeTab === 'connected' ? 'selected' : ''} onClick={() => setActiveTab('connected')}><Link size={15} /> Connected</button>
-            <button className={activeTab === 'similar' ? 'selected' : ''} onClick={() => setActiveTab('similar')}>Similar</button>
-          </div>
-
           <article className="study-info-card">
-            {activeTab === 'meaning' && (
-              <>
-                <b>Arti Ayat</b>
-                <p>{item.translation}</p>
-              </>
-            )}
-            {activeTab === 'context' && <p>Ayat sekitar: {items[index - 1]?.label ?? '-'} | {items[index + 1]?.label ?? '-'}</p>}
-            {activeTab === 'connected' && <p>Terhubung dengan target hari ini: {item.verseKeys.join(', ')}</p>}
-            {activeTab === 'similar' && <p>Deteksi ayat mirip akan dipakai frasa Arab dari data lokal. Versi awal belum menampilkan daftar lengkap.</p>}
+            <b>Arti Ayat</b>
+            <p>{item.translation}</p>
           </article>
 
           <article className="method-card">
@@ -212,19 +198,11 @@ export default function StudyView({ target, settings, onBack, onDone }: { target
             </div>
           </article>
 
-          <div className="audio-mode-toggle" aria-label="Mode audio">
-            <button className={audioMode === 'verse' ? 'selected' : ''} onClick={() => setAudioMode('verse')} type="button">Ayah audio</button>
-            <button className={audioMode === 'word' ? 'selected' : ''} onClick={() => setAudioMode('word')} type="button">Word audio</button>
-          </div>
-
-          {finished && <p className="success-box">Target selesai. Progres sudah diperbarui.</p>}
-
           <div className="study-actions">
             <button onClick={() => setIndex((value) => Math.max(0, value - 1))} disabled={index === 0}><ChevronLeft size={16} /> Prev</button>
             <button onClick={() => setIndex((value) => Math.min(items.length - 1, value + 1))} disabled={index >= items.length - 1}>Next <ChevronRight size={16} /></button>
-            <button onClick={() => void playCurrent()}>{playing ? <Pause size={16} /> : <Play size={16} />} Repeat 5x</button>
-            <button onClick={() => void playRange()}><RotateCcw size={16} /> Play range</button>
-            <button className="primary" onClick={() => void markDone()}>{index >= items.length - 1 ? 'Finish target' : 'Mark done'}</button>
+            <button className="primary" onClick={() => void playCurrent()}>{playing ? <Pause size={16} /> : <Play size={16} />} Play</button>
+            <button onClick={() => void markDone()}>{index >= items.length - 1 ? 'Finish' : 'Done'}</button>
           </div>
         </>
       )}
